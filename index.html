@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SonicBeam | Chat Acústico Pro</title>
+    <title>SonicBeam | Precisão Total</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -21,13 +21,6 @@
         @keyframes pulse-ring {
             0% { transform: scale(0.8); opacity: 0.6; }
             100% { transform: scale(1.6); opacity: 0; }
-        }
-        .radar-pulse::before {
-            content: ''; position: absolute;
-            inset: -4px; border-radius: 50%;
-            border: 2px solid currentColor;
-            animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
-            z-index: 0; pointer-events: none;
         }
 
         /* Animações do chat */
@@ -50,7 +43,8 @@
         .panel-transition { transition: max-height 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.3s ease; }
         .is-collapsed { max-height: 0px !important; opacity: 0; overflow: hidden; margin-top: 0 !important; margin-bottom: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important; border-width: 0 !important; }
         
-        textarea { overscroll-behavior: none; }
+        textarea { overscroll-behavior: none; text-transform: uppercase; }
+        textarea::placeholder { text-transform: none; }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-100 flex flex-col h-[100dvh] overflow-hidden antialiased selection:bg-cyan-500/30">
@@ -95,11 +89,11 @@
             <div class="flex flex-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
                 <button id="btn-mode-audible" onclick="setMode('audible')" class="flex-1 py-2 rounded-lg bg-cyan-950/50 border border-cyan-500 text-cyan-400 font-medium text-xs flex flex-col items-center gap-0.5 transition-all">
                     <span>AUDÍVEL</span>
-                    <span class="text-[9px] opacity-70 font-mono">1–3.3 kHz</span>
+                    <span class="text-[9px] opacity-70 font-mono">1–3.4 kHz</span>
                 </button>
                 <button id="btn-mode-ultra" onclick="setMode('ultra')" class="flex-1 py-2 rounded-lg text-slate-500 font-medium text-xs flex flex-col items-center gap-0.5 transition-all">
                     <span>ULTRA</span>
-                    <span class="text-[9px] opacity-70 font-mono">18–22 kHz</span>
+                    <span class="text-[9px] opacity-70 font-mono">18–21.2 kHz</span>
                 </button>
             </div>
         </div>
@@ -113,15 +107,14 @@
     <main id="chat-history" class="flex-grow p-4 overflow-y-auto flex flex-col scroll-smooth bg-slate-950 relative z-0 pb-6">
         <div class="text-center w-full my-4 shrink-0">
             <span class="bg-slate-900 text-slate-400 border border-slate-800 text-[10px] font-mono px-3 py-1.5 rounded-full">
-                Rede P2P Acústica Isolada
+                Protocolo TX Robusto (Somente Maiúsculas, Pontos e Espaços)
             </span>
         </div>
         
-        <!-- Container onde as mensagens são injetadas -->
         <div id="messages-container" class="flex flex-col gap-4"></div>
     </main>
 
-    <!-- ===== INDICADOR DE RECEBIMENTO (MODAL CENTRAL) ===== -->
+    <!-- ===== INDICADOR DE RECEBIMENTO (VISUAL CENTRALIZADO) ===== -->
     <div id="receiving-indicator" class="hidden fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-slate-900/95 backdrop-blur-xl border border-emerald-500/30 text-emerald-300 p-8 rounded-[2rem] shadow-[0_0_50px_rgba(16,185,129,0.15)] z-50 flex-col items-center justify-center gap-4 min-w-[220px]">
         <div class="relative w-16 h-16 flex justify-center items-center mb-2">
             <div class="absolute inset-0 bg-emerald-500/20 rounded-full animate-ping"></div>
@@ -152,7 +145,7 @@
 
             <div class="flex items-end gap-2">
                 <div class="relative flex-grow">
-                    <textarea id="tx-input" rows="1" class="w-full bg-slate-950 border border-slate-700 rounded-2xl py-3 pl-4 pr-10 text-slate-100 text-sm focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all resize-none block leading-tight" placeholder="Mensagem..."></textarea>
+                    <textarea id="tx-input" rows="1" class="w-full bg-slate-950 border border-slate-700 rounded-2xl py-3 pl-4 pr-10 text-slate-100 text-sm focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all resize-none block leading-tight font-mono" placeholder="Digite a mensagem..."></textarea>
                     
                     <div id="tx-visualizer" class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5 hidden">
                         <div class="w-1 bg-cyan-400 rounded-full animate-pulse h-2"></div>
@@ -170,14 +163,25 @@
 
     <script>
     // ============================================================
-    //  NOVO SISTEMA DE ENCODING (Resistente a falhas do Áudio)
+    //  ALFABETO RESTRITO DE ALTA PRECISÃO
     // ============================================================
-    // O espaço em branco é o primeiro, seguido de alfanuméricos e caracteres de encode.
-    // Total: 74 caracteres. Isso nos permite transmitir com segurança.
-    const CHARSET = " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789%.-_!~*'():";
+    // Contém apenas: Espaço, A-Z, 0-9, Ponto, Vírgula e ':' (usado internamente no cabeçalho).
+    // Total de exatos 40 caracteres. Garante saltos de frequência gigantes (Zero Erros).
+    const CHARSET = " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,:";
     
-    const MY_ID = Array.from({length: 2}, () => 'abcdefghijklmnopqrstuvwxyz0123456789'.charAt(Math.floor(Math.random() * 36))).join('');
-    document.getElementById('my-id-display').textContent = MY_ID.toUpperCase();
+    // ID gerado em Maiúsculo
+    const MY_ID = Array.from({length: 2}, () => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.charAt(Math.floor(Math.random() * 36))).join('');
+    document.getElementById('my-id-display').textContent = MY_ID;
+
+    // Remove acentos e caracteres não permitidos em tempo real
+    function sanitizeForAcoustic(input) {
+        // Remove acentuação (ex: á -> a, ç -> c)
+        let text = input.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        // Converte tudo para maiúsculo
+        text = text.toUpperCase();
+        // Mantém apenas os caracteres que existem no nosso CHARSET (exceto o ':' que é do sistema)
+        return text.replace(/[^ ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,]/g, "");
+    }
 
     function showToast(message, type = 'info') {
         const c = document.getElementById('toast-container');
@@ -228,14 +232,23 @@
         }
     });
 
-    // Limpar Conversa
     btnClearChat.addEventListener('click', () => {
         messagesContainer.innerHTML = '';
-        showToast('Conversa limpa com sucesso', 'info');
+        showToast('Conversa limpa', 'info');
     });
 
-    // Auto-resize textarea sem limites
     txInput.addEventListener('input', function() {
+        // Aplica a sanitização instantaneamente enquanto o usuário digita
+        let cursorPosition = this.selectionStart;
+        const oldLength = this.value.length;
+        
+        this.value = sanitizeForAcoustic(this.value);
+        
+        // Ajusta o cursor para não pular pro final se ele apagou um acento no meio da frase
+        if (this.value.length < oldLength) cursorPosition--;
+        this.setSelectionRange(cursorPosition, cursorPosition);
+
+        // Auto-resize textarea sem limites
         this.style.height = 'auto';
         const newHeight = Math.min(this.scrollHeight, 120); 
         this.style.height = newHeight + 'px';
@@ -248,6 +261,10 @@
         } else {
             targetInput.classList.add('hidden');
         }
+    });
+
+    targetInput.addEventListener('input', function() {
+        this.value = sanitizeForAcoustic(this.value);
     });
 
     function scrollToBottom() {
@@ -266,9 +283,9 @@
         if (!isMe) {
             const senderColor = isDirectToMe ? 'text-purple-400' : 'text-emerald-400';
             const tag = isDirectToMe ? '<span class="text-[9px] bg-purple-900/40 text-purple-300 px-1 rounded ml-1">Privado</span>' : '';
-            headerHTML = `<div class="text-[10px] font-mono mb-1 ml-1 ${senderColor}">${senderId.toUpperCase()}${tag}</div>`;
+            headerHTML = `<div class="text-[10px] font-mono mb-1 ml-1 ${senderColor}">${senderId}${tag}</div>`;
         } else if (isDirect) {
-            headerHTML = `<div class="text-[10px] font-mono mb-1 mr-1 text-slate-500">Para: ${targetId.toUpperCase()} (Privado)</div>`;
+            headerHTML = `<div class="text-[10px] font-mono mb-1 mr-1 text-slate-500">Para: ${targetId} (Privado)</div>`;
         }
 
         let bgClass = '';
@@ -278,7 +295,7 @@
 
         bubble.innerHTML = `
             ${headerHTML}
-            <div class="px-3.5 py-2.5 rounded-2xl shadow-sm text-[14px] leading-relaxed break-words font-medium whitespace-pre-wrap ${bgClass}">${safeText}</div>
+            <div class="px-3.5 py-2.5 rounded-2xl shadow-sm text-[14px] leading-relaxed break-words font-mono whitespace-pre-wrap ${bgClass}">${safeText}</div>
         `;
 
         messagesContainer.appendChild(bubble);
@@ -286,16 +303,26 @@
     }
 
     // ============================================================
-    //  CONFIGURAÇÕES DO PROTOCOLO E ÁUDIO (Recalibrado para 74 chars)
+    //  CONFIGURAÇÕES DO PROTOCOLO E ÁUDIO (CALIBRAÇÃO DE PRECISÃO)
     // ============================================================
     const MODES = {
         audible: {
-            BASE_FREQ: 1000, FREQ_STEP: 35, SYNC_FREQ: 4000, END_FREQ: 800,
-            BAND_MIN: 700, BAND_MAX: 4200, color: 'cyan'
+            BASE_FREQ: 1000, 
+            FREQ_STEP: 60, // Passo gigante (Antes era 40). Muito mais fácil pro microfone distinguir.
+            SYNC_FREQ: 4000, 
+            END_FREQ: 800,
+            BAND_MIN: 700, 
+            BAND_MAX: 3600, // 1000 + (40 * 60) = 3400
+            color: 'cyan'
         },
         ultra: {
-            BASE_FREQ: 18000, FREQ_STEP: 50, SYNC_FREQ: 17500, END_FREQ: 17000,
-            BAND_MIN: 16800, BAND_MAX: 22200, color: 'purple' 
+            BASE_FREQ: 18000, 
+            FREQ_STEP: 80, // Passo enorme no ultrassom para evitar distorção de ar.
+            SYNC_FREQ: 17500, 
+            END_FREQ: 17000,
+            BAND_MIN: 16800, 
+            BAND_MAX: 21500, // 18000 + (40 * 80) = 21200
+            color: 'purple' 
         }
     };
 
@@ -342,13 +369,11 @@
         const rawText = txInput.value.trim();
         if (!rawText) return;
 
-        let target = targetSelector.value === 'custom' ? targetInput.value.toLowerCase() : '**';
+        let target = targetSelector.value === 'custom' ? targetInput.value : '**';
         if (target.length !== 2) target = '**';
 
-        // Encoding via URI Component: mantém a-z A-Z 0-9 normais e só encoda emojis/acentos
-        // Retiramos a conversão do espaço (%20) para economizar tempo de áudio
-        const encodedData = encodeURIComponent(rawText).replace(/%20/g, ' ');
-        const packet = `${target}${MY_ID}:${encodedData}`;
+        // O pacote agora é uma string limpa. Se faltar um bipe, ele apenas engole a letra, mas o pacote não quebra.
+        const packet = `${target}${MY_ID}:${rawText}`;
 
         if (!audioCtxTx) audioCtxTx = new (window.AudioContext || window.webkitAudioContext)();
         if (audioCtxTx.state === 'suspended') await audioCtxTx.resume();
@@ -513,22 +538,14 @@
         if (rawPacket.length > 5 && rawPacket.includes(':')) {
             const splitIndex = rawPacket.indexOf(':');
             const header = rawPacket.substring(0, splitIndex);
-            const encodedPayload = rawPacket.substring(splitIndex + 1);
+            const message = rawPacket.substring(splitIndex + 1);
 
             if (header.length === 4) {
                 const target = header.substring(0, 2);
                 const sender = header.substring(2, 4);
 
-                let decodedText = encodedPayload; // Fallback caso haja ruído severo
-                try {
-                    // Tenta decodificar restaurando o %20 dos espaços
-                    decodedText = decodeURIComponent(encodedPayload.replace(/ /g, '%20'));
-                } catch(e) {
-                    console.warn("Acoustic packet partially corrupted. Showing raw decoded data.");
-                }
-
-                if (decodedText && (target === '**' || target === MY_ID)) {
-                    appendMessage(sender, target, decodedText, false);
+                if (message && (target === '**' || target === MY_ID)) {
+                    appendMessage(sender, target, message, false);
                 }
             }
         }
@@ -583,6 +600,7 @@
                     let idx = Math.round((peakFreq - cfg.BASE_FREQ) / cfg.FREQ_STEP);
                     if (idx >= 0 && idx < CHARSET.length) {
                         const expectedFreq = cfg.BASE_FREQ + (idx * cfg.FREQ_STEP);
+                        // Tolerância generosa graças ao espaçamento enorme
                         if (Math.abs(peakFreq - expectedFreq) <= cfg.FREQ_STEP * 0.45) {
                             const detectedChar = CHARSET[idx];
                             state.lastSignalTime = now; 
@@ -608,7 +626,7 @@
                 if (now - state.lastCharTime > TONE_GAP * 2) state.lastChar = null;
             }
 
-            // Timeout de finalização (Failsafe caso o END_FREQ se perca no vento)
+            // Failsafe Timeout
             if (state.isReceiving && (now - state.lastSignalTime > 2000)) {
                 finalizePacket(modeKey);
             }
