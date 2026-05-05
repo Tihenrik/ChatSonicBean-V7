@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SonicBeam | Chat Acústico</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        :root {
+            --cyan: #06b6d4;
+            --emerald: #10b981;
+            --ultra: #a855f7;
+        }
+
+        /* Usando Inter para leitura limpa e Mono para dados técnicos */
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        .font-mono { font-family: 'Share Tech Mono', monospace; }
+
+        /* Animação do radar / microfone */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 0.6; }
+            100% { transform: scale(1.6); opacity: 0; }
+        }
+        .radar-pulse::before {
+            content: ''; position: absolute;
+            inset: -4px; border-radius: 50%;
+            border: 2px solid currentColor;
+            animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+            z-index: 0; pointer-events: none;
+        }
+
+        /* Animações do chat */
+        .msg-bubble { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Indicador de digitação/recebimento */
+        .typing-dot { animation: blink 1.4s infinite both; }
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes blink { 0%, 100% { opacity: 0.2; transform: scale(0.8); } 20% { opacity: 1; transform: scale(1.2); } }
+
+        /* Esconde scrollbar mas mantém funcional */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+
+        /* Transição suave do painel */
+        .panel-transition { transition: max-height 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.3s ease; }
+        .is-collapsed { max-height: 0px !important; opacity: 0; overflow: hidden; margin-top: 0 !important; margin-bottom: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important; border-width: 0 !important; }
+        
+        /* Ajuste para textarea não scrollar o body no iOS */
+        textarea { overscroll-behavior: none; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 flex flex-col h-[100dvh] overflow-hidden antialiased selection:bg-cyan-500/30">
+
+    <!-- Container Global de Notificações -->
+    <div id="toast-container" class="fixed top-16 left-0 right-0 z-50 flex flex-col items-center gap-2 pointer-events-none px-4"></div>
+
+    <!-- ===== HEADER ===== -->
+    <header class="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 shrink-0 z-20 shadow-sm relative">
+        <!-- Indicador de Status Fino (Top) -->
+        <div id="top-status-bar" class="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-cyan-500 to-blue-500 transition-colors duration-500"></div>
+        
+        <div class="px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div id="rx-icon-wrapper" class="relative flex items-center justify-center w-9 h-9 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800/50 transition-colors">
+                    <i class="ph-fill ph-waves text-lg relative z-10"></i>
+                </div>
+                <div class="flex flex-col">
+                    <h1 class="text-[15px] font-bold tracking-wide flex items-center gap-1.5">
+                        SonicBeam <span id="my-id-display" class="bg-slate-800 text-slate-300 font-mono text-[10px] px-1.5 py-0.5 rounded border border-slate-700">--</span>
+                    </h1>
+                    <span id="rx-status-text" class="text-[10px] font-mono text-slate-500 uppercase tracking-widest">Aguardando Conexão</span>
+                </div>
+            </div>
+            
+            <!-- Botão de Engrenagem (Abre/Fecha Controles) -->
+            <button id="btn-toggle-panel" class="w-10 h-10 flex justify-center items-center rounded-full bg-slate-800 text-slate-300 hover:bg-slate-700 active:scale-95 transition-all">
+                <i class="ph-fill ph-faders text-xl"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- ===== PAINEL DE CONTROLE (RETRÁTIL) ===== -->
+    <div id="controls-panel" class="panel-transition bg-slate-900 border-b border-slate-800 shrink-0 flex flex-col px-4 py-4 max-h-[300px] z-10 relative">
+        <div class="flex flex-col md:flex-row gap-4 max-w-3xl mx-auto w-full">
+            
+            <!-- Botão Microfone -->
+            <button id="btn-listen" class="flex-1 bg-emerald-600 active:bg-emerald-700 text-white font-semibold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+                <i class="ph-fill ph-microphone text-xl"></i> CONECTAR À REDE
+            </button>
+
+            <!-- Seletor de Modo -->
+            <div class="flex flex-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                <button id="btn-mode-audible" onclick="setMode('audible')" class="flex-1 py-2 rounded-lg bg-cyan-950/50 border border-cyan-500 text-cyan-400 font-medium text-xs flex flex-col items-center gap-0.5 transition-all">
+                    <span>AUDÍVEL</span>
+                    <span class="text-[9px] opacity-70 font-mono">1–3.3 kHz</span>
+                </button>
+                <button id="btn-mode-ultra" onclick="setMode('ultra')" class="flex-1 py-2 rounded-lg text-slate-500 font-medium text-xs flex flex-col items-center gap-0.5 transition-all">
+                    <span>ULTRA</span>
+                    <span class="text-[9px] opacity-70 font-mono">18–22 kHz</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Espectrograma Compacto -->
+        <div class="mt-4 bg-slate-950 rounded-lg overflow-hidden border border-slate-800 h-10 max-w-3xl mx-auto w-full opacity-60">
+            <canvas id="spectrogram" class="w-full h-full block"></canvas>
+        </div>
+    </div>
+
+    <!-- ===== ÁREA DO CHAT ===== -->
+    <main id="chat-history" class="flex-grow p-4 overflow-y-auto flex flex-col gap-4 scroll-smooth bg-slate-950 relative z-0 pb-6">
+        
+        <div class="text-center w-full my-4">
+            <span class="bg-slate-900 text-slate-400 border border-slate-800 text-[10px] font-mono px-3 py-1.5 rounded-full">
+                Rede P2P Acústica Isolada
+            </span>
+        </div>
+
+        <!-- Mensagens renderizadas dinamicamente aqui -->
+        
+    </main>
+
+    <!-- ===== INDICADOR DE RECEBIMENTO ===== -->
+    <div id="receiving-indicator" class="hidden absolute bottom-[88px] left-1/2 -translate-x-1/2 bg-emerald-900/90 backdrop-blur border border-emerald-500/50 text-emerald-300 text-[10px] font-mono px-4 py-2 rounded-full items-center gap-2 shadow-lg z-20">
+        <i class="ph-fill ph-waves animate-pulse"></i>
+        <span>Decodificando áudio</span>
+        <div class="flex gap-1">
+            <div class="w-1.5 h-1.5 bg-emerald-400 rounded-full typing-dot"></div>
+            <div class="w-1.5 h-1.5 bg-emerald-400 rounded-full typing-dot"></div>
+            <div class="w-1.5 h-1.5 bg-emerald-400 rounded-full typing-dot"></div>
+        </div>
+    </div>
+
+    <!-- ===== ÁREA DE INPUT (FIXA NO RODAPÉ) ===== -->
+    <footer class="bg-slate-900 border-t border-slate-800 shrink-0 z-20 pb-[max(env(safe-area-inset-bottom),0px)]">
+        <div class="max-w-3xl mx-auto p-3 flex flex-col gap-2">
+            
+            <!-- Controles de Destino -->
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <span class="text-[10px] text-slate-400 font-mono">Enviar para:</span>
+                    <select id="target-selector" class="bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded px-2 py-1 outline-none focus:border-cyan-500 transition-colors">
+                        <option value="**">Todos (Broadcast)</option>
+                        <option value="custom">ID Privado...</option>
+                    </select>
+                    <input type="text" id="target-id-input" maxlength="2" placeholder="ID" class="hidden w-12 bg-slate-950 border border-cyan-500 text-cyan-300 text-xs rounded px-2 py-1 outline-none font-mono text-center uppercase shadow-[0_0_8px_rgba(6,182,212,0.2)]">
+                </div>
+                <span id="char-count" class="text-[10px] text-slate-500 font-mono">0/60</span>
+            </div>
+
+            <!-- Caixa de Texto e Enviar -->
+            <div class="flex items-end gap-2">
+                <div class="relative flex-grow">
+                    <textarea id="tx-input" rows="1" class="w-full bg-slate-950 border border-slate-700 rounded-2xl py-3 pl-4 pr-10 text-slate-100 text-sm focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all resize-none block leading-tight" placeholder="Mensagem..."></textarea>
+                    
+                    <!-- Efeito visual de envio (pulso) -->
+                    <div id="tx-visualizer" class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5 hidden">
+                        <div class="w-1 bg-cyan-400 rounded-full animate-pulse h-2"></div>
+                        <div class="w-1 bg-cyan-400 rounded-full animate-pulse h-4" style="animation-delay: 0.1s"></div>
+                        <div class="w-1 bg-cyan-400 rounded-full animate-pulse h-2" style="animation-delay: 0.2s"></div>
+                    </div>
+                </div>
+                
+                <button id="btn-transmit" class="w-12 h-12 shrink-0 flex items-center justify-center bg-cyan-600 text-white rounded-full transition-all active:scale-90 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i id="btn-transmit-icon" class="ph-fill ph-paper-plane-right text-xl ml-0.5"></i>
+                </button>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+    // ============================================================
+    //  ESTADO GLOBAL E UTILITÁRIOS
+    // ============================================================
+    const CHARSET = " abcdefghijklmnopqrstuvwxyz0123456789.,!?\n\r\t@#/:;()+-=*_";
+    const MY_ID = Array.from({length: 2}, () => 'abcdefghijklmnopqrstuvwxyz0123456789'.charAt(Math.floor(Math.random() * 36))).join('');
+    document.getElementById('my-id-display').textContent = MY_ID.toUpperCase();
+
+    function showToast(message, type = 'info') {
+        const c = document.getElementById('toast-container');
+        const t = document.createElement('div');
+        const color = type === 'error' ? 'bg-red-500 text-white' : type === 'success' ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-200 border border-slate-700';
+        t.className = `${color} px-4 py-2.5 rounded-2xl shadow-xl text-xs font-semibold flex items-center gap-2 pointer-events-auto transition-all duration-300 transform -translate-y-4 opacity-0 max-w-sm w-full mx-4`;
+        t.innerHTML = `<i class="ph-fill ${type === 'error' ? 'ph-warning' : type === 'success' ? 'ph-check-circle' : 'ph-info'} text-lg"></i> ${message}`;
+        c.appendChild(t);
+        
+        requestAnimationFrame(() => { t.style.opacity = '1'; t.style.transform = 'translateY(0)'; });
+        setTimeout(() => { 
+            t.style.opacity = '0'; t.style.transform = 'translateY(-10px)'; 
+            setTimeout(() => t.remove(), 300); 
+        }, 3500);
+    }
+
+    const delay = ms => new Promise(res => setTimeout(res, ms));
+
+    // ============================================================
+    //  UI INTERACTIONS (Mobile Focus)
+    // ============================================================
+    const panel = document.getElementById('controls-panel');
+    const btnTogglePanel = document.getElementById('btn-toggle-panel');
+    const targetSelector = document.getElementById('target-selector');
+    const targetInput = document.getElementById('target-id-input');
+    const txInput = document.getElementById('tx-input');
+    const charCount = document.getElementById('char-count');
+    const chatHistory = document.getElementById('chat-history');
+
+    // Abre e fecha o painel superior (Settings)
+    btnTogglePanel.addEventListener('click', () => {
+        panel.classList.toggle('is-collapsed');
+        const icon = btnTogglePanel.querySelector('i');
+        if(panel.classList.contains('is-collapsed')) {
+            icon.classList.replace('ph-caret-up', 'ph-faders');
+            btnTogglePanel.classList.replace('bg-cyan-900/50', 'bg-slate-800');
+            btnTogglePanel.classList.replace('text-cyan-400', 'text-slate-300');
+        } else {
+            icon.classList.replace('ph-faders', 'ph-caret-up');
+            btnTogglePanel.classList.replace('bg-slate-800', 'bg-cyan-900/50');
+            btnTogglePanel.classList.replace('text-slate-300', 'text-cyan-400');
+        }
+    });
+
+    // Auto-ajuste da altura do textarea (Máx 3 linhas)
+    txInput.addEventListener('input', function() {
+        // Limite de Caracteres e Remoção de Inválidos
+        let val = this.value.toLowerCase().split('').filter(c => CHARSET.includes(c)).join('');
+        if (val.length > 60) val = val.substring(0, 60);
+        if (val !== this.value.toLowerCase()) this.value = val;
+        
+        charCount.textContent = `${val.length}/60`;
+
+        // Auto-resize
+        this.style.height = 'auto';
+        const newHeight = Math.min(this.scrollHeight, 100); 
+        this.style.height = newHeight + 'px';
+    });
+
+    targetSelector.addEventListener('change', (e) => {
+        if(e.target.value === 'custom') {
+            targetInput.classList.remove('hidden');
+            targetInput.focus();
+        } else {
+            targetInput.classList.add('hidden');
+        }
+    });
+
+    function scrollToBottom() {
+        chatHistory.scrollTo({ top: chatHistory.scrollHeight, behavior: 'smooth' });
+    }
+
+    function appendMessage(senderId, targetId, text, isMe) {
+        const bubble = document.createElement('div');
+        const isDirect = targetId !== '**';
+        const isDirectToMe = targetId === MY_ID;
+
+        bubble.className = `msg-bubble flex flex-col max-w-[85%] ${isMe ? 'self-end items-end' : 'self-start items-start'} mb-1`;
+
+        let headerHTML = '';
+        if (!isMe) {
+            const senderColor = isDirectToMe ? 'text-purple-400' : 'text-emerald-400';
+            const tag = isDirectToMe ? '<span class="text-[9px] bg-purple-900/40 text-purple-300 px-1 rounded ml-1">Privado</span>' : '';
+            headerHTML = `<div class="text-[10px] font-mono mb-1 ml-1 ${senderColor}">${senderId.toUpperCase()}${tag}</div>`;
+        } else if (isDirect) {
+            headerHTML = `<div class="text-[10px] font-mono mb-1 mr-1 text-slate-500">Para: ${targetId.toUpperCase()} (Privado)</div>`;
+        }
+
+        let bgClass = '';
+        if (isMe) bgClass = 'bg-cyan-600 text-white rounded-br-sm';
+        else if (isDirectToMe) bgClass = 'bg-purple-900 border border-purple-700 text-white rounded-bl-sm';
+        else bgClass = 'bg-slate-800 border border-slate-700 text-slate-200 rounded-bl-sm';
+
+        bubble.innerHTML = `
+            ${headerHTML}
+            <div class="px-3.5 py-2 rounded-2xl shadow-sm text-[13px] leading-relaxed break-words font-medium ${bgClass}">
+                ${text}
+            </div>
+        `;
+
+        chatHistory.appendChild(bubble);
+        scrollToBottom();
+    }
+
+    // ============================================================
+    //  CONFIGURAÇÕES DO PROTOCOLO E ÁUDIO
+    // ============================================================
+    const MODES = {
+        audible: {
+            BASE_FREQ: 1000, FREQ_STEP: 40, SYNC_FREQ: 4000, END_FREQ: 800,
+            BAND_MIN: 700, BAND_MAX: 4200, color: 'cyan'
+        },
+        ultra: {
+            BASE_FREQ: 18000, FREQ_STEP: 70, SYNC_FREQ: 17500, END_FREQ: 17000,
+            BAND_MIN: 16800, BAND_MAX: 22500, color: 'purple'
+        }
+    };
+
+    const TONE_DURATION = 150; 
+    const TONE_GAP = 50;       
+
+    let currentMode = 'audible';
+    let isTransmitting = false;
+
+    function setMode(mode) {
+        if (isTransmitting) return showToast('Aguarde o fim da transmissão.', 'error');
+        currentMode = mode;
+        const isUltra = mode === 'ultra';
+        
+        const btnAudible = document.getElementById('btn-mode-audible');
+        const btnUltra = document.getElementById('btn-mode-ultra');
+        const topBar = document.getElementById('top-status-bar');
+        const txBtn = document.getElementById('btn-transmit');
+        
+        if (isUltra) {
+            btnUltra.className = 'flex-1 py-2 rounded-lg bg-purple-900/50 border border-purple-500 text-purple-300 font-medium text-xs flex flex-col items-center gap-0.5 transition-all';
+            btnAudible.className = 'flex-1 py-2 rounded-lg border border-transparent text-slate-500 font-medium text-xs flex flex-col items-center gap-0.5 transition-all';
+            topBar.className = 'absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-purple-500 to-fuchsia-500 transition-colors duration-500';
+            txBtn.className = 'w-12 h-12 shrink-0 flex items-center justify-center bg-purple-600 text-white rounded-full transition-all active:scale-90 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(168,85,247,0.3)]';
+        } else {
+            btnAudible.className = 'flex-1 py-2 rounded-lg bg-cyan-950/50 border border-cyan-500 text-cyan-400 font-medium text-xs flex flex-col items-center gap-0.5 transition-all';
+            btnUltra.className = 'flex-1 py-2 rounded-lg border border-transparent text-slate-500 font-medium text-xs flex flex-col items-center gap-0.5 transition-all';
+            topBar.className = 'absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-cyan-500 to-blue-500 transition-colors duration-500';
+            txBtn.className = 'w-12 h-12 shrink-0 flex items-center justify-center bg-cyan-600 text-white rounded-full transition-all active:scale-90 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(6,182,212,0.3)]';
+        }
+    }
+
+    // ============================================================
+    //  TRANSMISSÃO (TX)
+    // ============================================================
+    const btnTransmit = document.getElementById('btn-transmit');
+    const txVisualizer = document.getElementById('tx-visualizer');
+    const txIcon = document.getElementById('btn-transmit-icon');
+    let audioCtxTx = null;
+
+    btnTransmit.addEventListener('click', async () => {
+        if (isTransmitting) return;
+
+        const raw = txInput.value.trim();
+        if (!raw) return;
+
+        let target = targetSelector.value === 'custom' ? targetInput.value.toLowerCase() : '**';
+        if (target.length !== 2) target = '**';
+
+        const packet = `${target}${MY_ID}:${raw}`;
+
+        if (!audioCtxTx) audioCtxTx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtxTx.state === 'suspended') await audioCtxTx.resume();
+
+        isTransmitting = true;
+        btnTransmit.disabled = true;
+        txIcon.classList.add('hidden');
+        txVisualizer.classList.remove('hidden');
+        
+        // Estiliza visualizador com a cor do modo
+        const visBars = txVisualizer.querySelectorAll('div');
+        visBars.forEach(b => b.className = `w-1 rounded-full animate-pulse ${currentMode === 'ultra' ? 'bg-purple-300' : 'bg-cyan-200'}`);
+        visBars[0].classList.add('h-2'); visBars[1].classList.add('h-4'); visBars[2].classList.add('h-2');
+
+        appendMessage(MY_ID, target, raw, true);
+        txInput.value = '';
+        txInput.style.height = 'auto'; // Reseta altura
+        charCount.textContent = '0/60';
+
+        const cfg = MODES[currentMode];
+
+        playToneNow(audioCtxTx, cfg.SYNC_FREQ, 0.4);
+        await delay(400 + TONE_GAP);
+
+        for (let i = 0; i < packet.length; i++) {
+            const char = packet[i];
+            const index = CHARSET.indexOf(char);
+            if (index !== -1) {
+                const freq = cfg.BASE_FREQ + (index * cfg.FREQ_STEP);
+                playToneNow(audioCtxTx, freq, TONE_DURATION / 1000);
+            }
+            await delay(TONE_DURATION + TONE_GAP);
+        }
+
+        playToneNow(audioCtxTx, cfg.END_FREQ, 0.3);
+        await delay(300);
+
+        isTransmitting = false;
+        btnTransmit.disabled = false;
+        txVisualizer.classList.add('hidden');
+        txIcon.classList.remove('hidden');
+        
+        // Ocultar teclado no mobile após envio
+        txInput.blur();
+    });
+
+    function playToneNow(ctx, freq, duration) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        
+        const startTime = ctx.currentTime;
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(currentMode === 'ultra' ? 0.8 : 1.0, startTime + 0.015);
+        gain.gain.setValueAtTime(currentMode === 'ultra' ? 0.8 : 1.0, startTime + duration - 0.015);
+        gain.gain.linearRampToValueAtTime(0, startTime + duration);
+        
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+    }
+
+    function playIncomingAlert() {
+        if (isTransmitting) return;
+        if (!audioCtxTx) audioCtxTx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        const ctx = audioCtxTx;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1000, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(2000, ctx.currentTime + 0.1);
+        
+        gain.gain.setValueAtTime(0, ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.15, ctx.currentTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+        
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.2);
+    }
+
+    // ============================================================
+    //  RECEPÇÃO (RX) E DECODIFICAÇÃO
+    // ============================================================
+    const btnListen = document.getElementById('btn-listen');
+    const rxIconWrapper = document.getElementById('rx-icon-wrapper');
+    const rxStatusText = document.getElementById('rx-status-text');
+    const spectrogram = document.getElementById('spectrogram');
+    const specCtx = spectrogram.getContext('2d');
+    const receivingIndicator = document.getElementById('receiving-indicator');
+
+    let audioCtxRx = null;
+    let analyser = null;
+    let isListening = false;
+    let rxInterval = null;
+
+    const decoders = {
+        audible: { lastChar: null, lastCharTime: 0, candidate: null, count: 0, buffer: "", isReceiving: false, lastSignalTime: 0 },
+        ultra:   { lastChar: null, lastCharTime: 0, candidate: null, count: 0, buffer: "", isReceiving: false, lastSignalTime: 0 }
+    };
+
+    btnListen.addEventListener('click', async () => {
+        if (isListening) { stopListening(); return; }
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+            });
+
+            audioCtxRx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
+            const source = audioCtxRx.createMediaStreamSource(stream);
+
+            analyser = audioCtxRx.createAnalyser();
+            analyser.fftSize = 8192; 
+            analyser.smoothingTimeConstant = 0.15;
+            source.connect(analyser);
+
+            isListening = true;
+            btnListen.innerHTML = '<i class="ph-fill ph-stop text-xl"></i> DESCONECTAR';
+            btnListen.classList.replace('bg-emerald-600', 'bg-red-500');
+            btnListen.classList.replace('active:bg-emerald-700', 'active:bg-red-600');
+            
+            rxIconWrapper.classList.add('radar-pulse');
+            rxIconWrapper.classList.replace('bg-cyan-950', 'bg-emerald-950');
+            rxIconWrapper.classList.replace('text-cyan-400', 'text-emerald-400');
+            rxIconWrapper.classList.replace('border-cyan-800/50', 'border-emerald-500/50');
+            
+            rxStatusText.textContent = 'OUVINDO AMBIENTE...';
+            rxStatusText.classList.replace('text-slate-500', 'text-emerald-400');
+
+            // Recolhe o painel automaticamente no mobile após ligar para limpar a tela
+            if(window.innerWidth < 768 && !panel.classList.contains('is-collapsed')) {
+                btnTogglePanel.click();
+            }
+
+            analyzeAudio();
+        } catch (err) {
+            showToast('Permissão de microfone negada.', 'error');
+        }
+    });
+
+    function stopListening() {
+        isListening = false;
+        cancelAnimationFrame(rxInterval);
+        if (audioCtxRx) { audioCtxRx.close(); audioCtxRx = null; }
+        
+        btnListen.innerHTML = '<i class="ph-fill ph-microphone text-xl"></i> CONECTAR À REDE';
+        btnListen.classList.replace('bg-red-500', 'bg-emerald-600');
+        btnListen.classList.replace('active:bg-red-600', 'active:bg-emerald-700');
+        
+        rxIconWrapper.classList.remove('radar-pulse');
+        rxIconWrapper.classList.replace('bg-emerald-950', 'bg-cyan-950');
+        rxIconWrapper.classList.replace('text-emerald-400', 'text-cyan-400');
+        rxIconWrapper.classList.replace('border-emerald-500/50', 'border-cyan-800/50');
+        
+        rxStatusText.textContent = 'AGUARDANDO CONEXÃO';
+        rxStatusText.classList.replace('text-emerald-400', 'text-slate-500');
+        
+        specCtx.clearRect(0, 0, spectrogram.width, spectrogram.height);
+        receivingIndicator.classList.add('hidden');
+        receivingIndicator.classList.remove('flex');
+    }
+
+    function checkUIIndicator() {
+        if (decoders.audible.isReceiving || decoders.ultra.isReceiving) {
+            receivingIndicator.classList.remove('hidden');
+            receivingIndicator.classList.add('flex');
+        } else {
+            receivingIndicator.classList.add('hidden');
+            receivingIndicator.classList.remove('flex');
+        }
+    }
+
+    function finalizePacket(modeKey) {
+        const state = decoders[modeKey];
+        state.isReceiving = false;
+        
+        const rawPacket = state.buffer;
+        state.buffer = "";
+        checkUIIndicator();
+
+        if (isTransmitting) return;
+
+        if (rawPacket.length > 5 && rawPacket.includes(':')) {
+            const splitIndex = rawPacket.indexOf(':');
+            const header = rawPacket.substring(0, splitIndex);
+            const message = rawPacket.substring(splitIndex + 1);
+
+            if (header.length === 4) {
+                const target = header.substring(0, 2);
+                const sender = header.substring(2, 4);
+
+                if (target === '**' || target === MY_ID) {
+                    appendMessage(sender, target, message, false);
+                }
+            }
+        }
+    }
+
+    function analyzeAudio() {
+        if (!isListening) return;
+
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+        analyser.getByteFrequencyData(dataArray);
+
+        const hzPerBin = (audioCtxRx.sampleRate / 2) / bufferLength;
+
+        // Só desenha se o painel estiver aberto para poupar bateria
+        if(!panel.classList.contains('is-collapsed')) {
+            drawSpectrogram(dataArray);
+        }
+
+        const now = performance.now();
+
+        for (const modeKey of ['audible', 'ultra']) {
+            const cfg = MODES[modeKey];
+            const state = decoders[modeKey];
+            
+            const minBin = Math.floor(cfg.BAND_MIN / hzPerBin);
+            const maxBin = Math.ceil(cfg.BAND_MAX / hzPerBin);
+
+            let maxEnergy = 0, peakBin = 0;
+            for (let i = minBin; i <= maxBin; i++) {
+                if (dataArray[i] > maxEnergy) { maxEnergy = dataArray[i]; peakBin = i; }
+            }
+
+            const peakFreq = peakBin * hzPerBin;
+            const threshold = modeKey === 'ultra' ? 120 : 130;
+
+            if (maxEnergy > threshold) {
+                if (Math.abs(peakFreq - cfg.SYNC_FREQ) < (cfg.FREQ_STEP * 0.8)) {
+                    if (!state.isReceiving) {
+                        state.isReceiving = true;
+                        state.buffer = "";
+                        state.lastSignalTime = now;
+                        playIncomingAlert();
+                        checkUIIndicator();
+                    }
+                    state.lastChar = null;
+                    state.candidate = null;
+                    state.count = 0;
+                } else if (Math.abs(peakFreq - cfg.END_FREQ) < (cfg.FREQ_STEP * 0.8)) {
+                    if (state.isReceiving) finalizePacket(modeKey);
+                    state.candidate = null;
+                    state.count = 0;
+                } else if (state.isReceiving) {
+                    let idx = Math.round((peakFreq - cfg.BASE_FREQ) / cfg.FREQ_STEP);
+                    if (idx >= 0 && idx < CHARSET.length) {
+                        const expectedFreq = cfg.BASE_FREQ + (idx * cfg.FREQ_STEP);
+                        if (Math.abs(peakFreq - expectedFreq) <= cfg.FREQ_STEP * 0.45) {
+                            const detectedChar = CHARSET[idx];
+                            state.lastSignalTime = now; 
+                            
+                            if (detectedChar === state.candidate) state.count++;
+                            else { state.candidate = detectedChar; state.count = 1; }
+
+                            if (state.count >= 4) {
+                                if (state.candidate !== state.lastChar || (now - state.lastCharTime) > (TONE_DURATION + TONE_GAP * 0.85)) {
+                                    state.buffer += state.candidate;
+                                    state.lastChar = state.candidate;
+                                    state.lastCharTime = now;
+                                }
+                                state.count = 0; 
+                            }
+                        } else {
+                            state.candidate = null; state.count = 0;
+                        }
+                    }
+                }
+            } else {
+                state.candidate = null; state.count = 0;
+                if (now - state.lastCharTime > TONE_GAP * 2) state.lastChar = null;
+            }
+
+            if (state.isReceiving && (now - state.lastSignalTime > 2000)) {
+                finalizePacket(modeKey);
+            }
+        }
+
+        rxInterval = requestAnimationFrame(analyzeAudio);
+    }
+
+    function drawSpectrogram(dataArray) {
+        if(spectrogram.clientWidth === 0) return;
+        spectrogram.width = spectrogram.clientWidth;
+        spectrogram.height = spectrogram.clientHeight;
+        const w = spectrogram.width;
+        const h = spectrogram.height;
+        const step = Math.ceil(dataArray.length / w);
+
+        specCtx.clearRect(0, 0, w, h);
+
+        for (let i = 0; i < w; i++) {
+            let sum = 0;
+            for (let j = 0; j < step; j++) sum += dataArray[(i * step) + j] || 0;
+            const avg = sum / step;
+            const barH = (avg / 255) * h;
+
+            const freqAtPixel = (i / w) * (audioCtxRx.sampleRate / 2);
+            specCtx.fillStyle = freqAtPixel > 17000 ? '#a855f7' : '#10b981'; 
+            specCtx.fillRect(i, h - barH, 2, barH);
+        }
+    }
+    </script>
+</body>
+</html>
