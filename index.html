@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SonicBeam | Chat Acústico</title>
+    <title>SonicBeam | Chat Acústico Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -15,11 +15,9 @@
             --ultra: #a855f7;
         }
 
-        /* Usando Inter para leitura limpa e Mono para dados técnicos */
         body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
         .font-mono { font-family: 'Share Tech Mono', monospace; }
 
-        /* Animação do radar / microfone */
         @keyframes pulse-ring {
             0% { transform: scale(0.8); opacity: 0.6; }
             100% { transform: scale(1.6); opacity: 0; }
@@ -45,27 +43,22 @@
         .typing-dot:nth-child(3) { animation-delay: 0.4s; }
         @keyframes blink { 0%, 100% { opacity: 0.2; transform: scale(0.8); } 20% { opacity: 1; transform: scale(1.2); } }
 
-        /* Esconde scrollbar mas mantém funcional */
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
 
-        /* Transição suave do painel */
         .panel-transition { transition: max-height 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.3s ease; }
         .is-collapsed { max-height: 0px !important; opacity: 0; overflow: hidden; margin-top: 0 !important; margin-bottom: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important; border-width: 0 !important; }
         
-        /* Ajuste para textarea não scrollar o body no iOS */
         textarea { overscroll-behavior: none; }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-100 flex flex-col h-[100dvh] overflow-hidden antialiased selection:bg-cyan-500/30">
 
-    <!-- Container Global de Notificações -->
-    <div id="toast-container" class="fixed top-16 left-0 right-0 z-50 flex flex-col items-center gap-2 pointer-events-none px-4"></div>
+    <div id="toast-container" class="fixed top-16 left-0 right-0 z-[60] flex flex-col items-center gap-2 pointer-events-none px-4"></div>
 
     <!-- ===== HEADER ===== -->
     <header class="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 shrink-0 z-20 shadow-sm relative">
-        <!-- Indicador de Status Fino (Top) -->
         <div id="top-status-bar" class="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-cyan-500 to-blue-500 transition-colors duration-500"></div>
         
         <div class="px-4 py-3 flex items-center justify-between">
@@ -81,23 +74,19 @@
                 </div>
             </div>
             
-            <!-- Botão de Engrenagem (Abre/Fecha Controles) -->
             <button id="btn-toggle-panel" class="w-10 h-10 flex justify-center items-center rounded-full bg-slate-800 text-slate-300 hover:bg-slate-700 active:scale-95 transition-all">
                 <i class="ph-fill ph-faders text-xl"></i>
             </button>
         </div>
     </header>
 
-    <!-- ===== PAINEL DE CONTROLE (RETRÁTIL) ===== -->
+    <!-- ===== PAINEL DE CONTROLE ===== -->
     <div id="controls-panel" class="panel-transition bg-slate-900 border-b border-slate-800 shrink-0 flex flex-col px-4 py-4 max-h-[300px] z-10 relative">
         <div class="flex flex-col md:flex-row gap-4 max-w-3xl mx-auto w-full">
-            
-            <!-- Botão Microfone -->
             <button id="btn-listen" class="flex-1 bg-emerald-600 active:bg-emerald-700 text-white font-semibold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
                 <i class="ph-fill ph-microphone text-xl"></i> CONECTAR À REDE
             </button>
 
-            <!-- Seletor de Modo -->
             <div class="flex flex-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
                 <button id="btn-mode-audible" onclick="setMode('audible')" class="flex-1 py-2 rounded-lg bg-cyan-950/50 border border-cyan-500 text-cyan-400 font-medium text-xs flex flex-col items-center gap-0.5 transition-all">
                     <span>AUDÍVEL</span>
@@ -110,7 +99,6 @@
             </div>
         </div>
 
-        <!-- Espectrograma Compacto -->
         <div class="mt-4 bg-slate-950 rounded-lg overflow-hidden border border-slate-800 h-10 max-w-3xl mx-auto w-full opacity-60">
             <canvas id="spectrogram" class="w-full h-full block"></canvas>
         </div>
@@ -118,33 +106,31 @@
 
     <!-- ===== ÁREA DO CHAT ===== -->
     <main id="chat-history" class="flex-grow p-4 overflow-y-auto flex flex-col gap-4 scroll-smooth bg-slate-950 relative z-0 pb-6">
-        
         <div class="text-center w-full my-4">
             <span class="bg-slate-900 text-slate-400 border border-slate-800 text-[10px] font-mono px-3 py-1.5 rounded-full">
                 Rede P2P Acústica Isolada
             </span>
         </div>
-
-        <!-- Mensagens renderizadas dinamicamente aqui -->
-        
     </main>
 
-    <!-- ===== INDICADOR DE RECEBIMENTO ===== -->
-    <div id="receiving-indicator" class="hidden absolute bottom-[88px] left-1/2 -translate-x-1/2 bg-emerald-900/90 backdrop-blur border border-emerald-500/50 text-emerald-300 text-[10px] font-mono px-4 py-2 rounded-full items-center gap-2 shadow-lg z-20">
-        <i class="ph-fill ph-waves animate-pulse"></i>
-        <span>Decodificando áudio</span>
-        <div class="flex gap-1">
-            <div class="w-1.5 h-1.5 bg-emerald-400 rounded-full typing-dot"></div>
-            <div class="w-1.5 h-1.5 bg-emerald-400 rounded-full typing-dot"></div>
-            <div class="w-1.5 h-1.5 bg-emerald-400 rounded-full typing-dot"></div>
+    <!-- ===== INDICADOR DE RECEBIMENTO (MODAL CENTRAL) ===== -->
+    <div id="receiving-indicator" class="hidden fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-slate-900/90 backdrop-blur-xl border border-emerald-500/30 text-emerald-300 p-8 rounded-[2rem] shadow-[0_0_50px_rgba(16,185,129,0.15)] z-50 flex-col items-center justify-center gap-4 min-w-[220px]">
+        <div class="relative w-16 h-16 flex justify-center items-center mb-2">
+            <div class="absolute inset-0 bg-emerald-500/20 rounded-full animate-ping"></div>
+            <i class="ph-fill ph-radar text-4xl text-emerald-400 relative z-10 animate-[spin_3s_linear_infinite]"></i>
+        </div>
+        <span class="font-bold tracking-wider text-sm uppercase">Recebendo Dados</span>
+        <div class="flex gap-2 mt-1">
+            <div class="w-2.5 h-2.5 bg-emerald-400 rounded-full typing-dot"></div>
+            <div class="w-2.5 h-2.5 bg-emerald-400 rounded-full typing-dot"></div>
+            <div class="w-2.5 h-2.5 bg-emerald-400 rounded-full typing-dot"></div>
         </div>
     </div>
 
-    <!-- ===== ÁREA DE INPUT (FIXA NO RODAPÉ) ===== -->
+    <!-- ===== ÁREA DE INPUT ===== -->
     <footer class="bg-slate-900 border-t border-slate-800 shrink-0 z-20 pb-[max(env(safe-area-inset-bottom),0px)]">
         <div class="max-w-3xl mx-auto p-3 flex flex-col gap-2">
             
-            <!-- Controles de Destino -->
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                     <span class="text-[10px] text-slate-400 font-mono">Enviar para:</span>
@@ -154,15 +140,12 @@
                     </select>
                     <input type="text" id="target-id-input" maxlength="2" placeholder="ID" class="hidden w-12 bg-slate-950 border border-cyan-500 text-cyan-300 text-xs rounded px-2 py-1 outline-none font-mono text-center uppercase shadow-[0_0_8px_rgba(6,182,212,0.2)]">
                 </div>
-                <span id="char-count" class="text-[10px] text-slate-500 font-mono">0/60</span>
             </div>
 
-            <!-- Caixa de Texto e Enviar -->
             <div class="flex items-end gap-2">
                 <div class="relative flex-grow">
                     <textarea id="tx-input" rows="1" class="w-full bg-slate-950 border border-slate-700 rounded-2xl py-3 pl-4 pr-10 text-slate-100 text-sm focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all resize-none block leading-tight" placeholder="Mensagem..."></textarea>
                     
-                    <!-- Efeito visual de envio (pulso) -->
                     <div id="tx-visualizer" class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5 hidden">
                         <div class="w-1 bg-cyan-400 rounded-full animate-pulse h-2"></div>
                         <div class="w-1 bg-cyan-400 rounded-full animate-pulse h-4" style="animation-delay: 0.1s"></div>
@@ -179,9 +162,28 @@
 
     <script>
     // ============================================================
-    //  ESTADO GLOBAL E UTILITÁRIOS
+    //  ENCODER / DECODER BASE64 (Suporte a UTF-8, Acentos, Emojis)
     // ============================================================
-    const CHARSET = " abcdefghijklmnopqrstuvwxyz0123456789.,!?\n\r\t@#/:;()+-=*_";
+    function utf8ToBase64(str) {
+        return btoa(unescape(encodeURIComponent(str)));
+    }
+    function base64ToUtf8(str) {
+        try {
+            return decodeURIComponent(escape(atob(str)));
+        } catch (e) {
+            return null; // Falha na decodificação devido a ruído
+        }
+    }
+    function escapeHTML(str) {
+        return str.replace(/[&<>'"]/g, tag => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+        }[tag]));
+    }
+
+    // O CHARSET FDM agora contém exatamente o alfabeto Base64 + o separador ':'
+    // Tamanho total: 66 caracteres.
+    const CHARSET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=:";
+    
     const MY_ID = Array.from({length: 2}, () => 'abcdefghijklmnopqrstuvwxyz0123456789'.charAt(Math.floor(Math.random() * 36))).join('');
     document.getElementById('my-id-display').textContent = MY_ID.toUpperCase();
 
@@ -203,17 +205,15 @@
     const delay = ms => new Promise(res => setTimeout(res, ms));
 
     // ============================================================
-    //  UI INTERACTIONS (Mobile Focus)
+    //  UI INTERACTIONS 
     // ============================================================
     const panel = document.getElementById('controls-panel');
     const btnTogglePanel = document.getElementById('btn-toggle-panel');
     const targetSelector = document.getElementById('target-selector');
     const targetInput = document.getElementById('target-id-input');
     const txInput = document.getElementById('tx-input');
-    const charCount = document.getElementById('char-count');
     const chatHistory = document.getElementById('chat-history');
 
-    // Abre e fecha o painel superior (Settings)
     btnTogglePanel.addEventListener('click', () => {
         panel.classList.toggle('is-collapsed');
         const icon = btnTogglePanel.querySelector('i');
@@ -228,18 +228,10 @@
         }
     });
 
-    // Auto-ajuste da altura do textarea (Máx 3 linhas)
+    // Auto-resize textarea apenas (limites de caracteres removidos)
     txInput.addEventListener('input', function() {
-        // Limite de Caracteres e Remoção de Inválidos
-        let val = this.value.toLowerCase().split('').filter(c => CHARSET.includes(c)).join('');
-        if (val.length > 60) val = val.substring(0, 60);
-        if (val !== this.value.toLowerCase()) this.value = val;
-        
-        charCount.textContent = `${val.length}/60`;
-
-        // Auto-resize
         this.style.height = 'auto';
-        const newHeight = Math.min(this.scrollHeight, 100); 
+        const newHeight = Math.min(this.scrollHeight, 120); 
         this.style.height = newHeight + 'px';
     });
 
@@ -260,6 +252,7 @@
         const bubble = document.createElement('div');
         const isDirect = targetId !== '**';
         const isDirectToMe = targetId === MY_ID;
+        const safeText = escapeHTML(text);
 
         bubble.className = `msg-bubble flex flex-col max-w-[85%] ${isMe ? 'self-end items-end' : 'self-start items-start'} mb-1`;
 
@@ -279,9 +272,7 @@
 
         bubble.innerHTML = `
             ${headerHTML}
-            <div class="px-3.5 py-2 rounded-2xl shadow-sm text-[13px] leading-relaxed break-words font-medium ${bgClass}">
-                ${text}
-            </div>
+            <div class="px-3.5 py-2.5 rounded-2xl shadow-sm text-[14px] leading-relaxed break-words font-medium whitespace-pre-wrap ${bgClass}">${safeText}</div>
         `;
 
         chatHistory.appendChild(bubble);
@@ -298,7 +289,7 @@
         },
         ultra: {
             BASE_FREQ: 18000, FREQ_STEP: 70, SYNC_FREQ: 17500, END_FREQ: 17000,
-            BAND_MIN: 16800, BAND_MAX: 22500, color: 'purple'
+            BAND_MIN: 16800, BAND_MAX: 22700, color: 'purple' // Band max ajustado levemente para caber o alfabeto base64 (66)
         }
     };
 
@@ -342,13 +333,15 @@
     btnTransmit.addEventListener('click', async () => {
         if (isTransmitting) return;
 
-        const raw = txInput.value.trim();
-        if (!raw) return;
+        const rawText = txInput.value.trim();
+        if (!rawText) return;
 
         let target = targetSelector.value === 'custom' ? targetInput.value.toLowerCase() : '**';
         if (target.length !== 2) target = '**';
 
-        const packet = `${target}${MY_ID}:${raw}`;
+        // Codificação robusta convertendo caracteres complexos em pacote seguro FDM
+        const encodedData = utf8ToBase64(rawText);
+        const packet = `${target}${MY_ID}:${encodedData}`;
 
         if (!audioCtxTx) audioCtxTx = new (window.AudioContext || window.webkitAudioContext)();
         if (audioCtxTx.state === 'suspended') await audioCtxTx.resume();
@@ -358,15 +351,13 @@
         txIcon.classList.add('hidden');
         txVisualizer.classList.remove('hidden');
         
-        // Estiliza visualizador com a cor do modo
         const visBars = txVisualizer.querySelectorAll('div');
         visBars.forEach(b => b.className = `w-1 rounded-full animate-pulse ${currentMode === 'ultra' ? 'bg-purple-300' : 'bg-cyan-200'}`);
         visBars[0].classList.add('h-2'); visBars[1].classList.add('h-4'); visBars[2].classList.add('h-2');
 
-        appendMessage(MY_ID, target, raw, true);
+        appendMessage(MY_ID, target, rawText, true);
         txInput.value = '';
-        txInput.style.height = 'auto'; // Reseta altura
-        charCount.textContent = '0/60';
+        txInput.style.height = 'auto'; 
 
         const cfg = MODES[currentMode];
 
@@ -390,8 +381,6 @@
         btnTransmit.disabled = false;
         txVisualizer.classList.add('hidden');
         txIcon.classList.remove('hidden');
-        
-        // Ocultar teclado no mobile após envio
         txInput.blur();
     });
 
@@ -411,28 +400,6 @@
         gain.connect(ctx.destination);
         osc.start(startTime);
         osc.stop(startTime + duration);
-    }
-
-    function playIncomingAlert() {
-        if (isTransmitting) return;
-        if (!audioCtxTx) audioCtxTx = new (window.AudioContext || window.webkitAudioContext)();
-        
-        const ctx = audioCtxTx;
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(1000, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(2000, ctx.currentTime + 0.1);
-        
-        gain.gain.setValueAtTime(0, ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0.15, ctx.currentTime + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
-        
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.2);
     }
 
     // ============================================================
@@ -484,7 +451,6 @@
             rxStatusText.textContent = 'OUVINDO AMBIENTE...';
             rxStatusText.classList.replace('text-slate-500', 'text-emerald-400');
 
-            // Recolhe o painel automaticamente no mobile após ligar para limpar a tela
             if(window.innerWidth < 768 && !panel.classList.contains('is-collapsed')) {
                 btnTogglePanel.click();
             }
@@ -540,14 +506,17 @@
         if (rawPacket.length > 5 && rawPacket.includes(':')) {
             const splitIndex = rawPacket.indexOf(':');
             const header = rawPacket.substring(0, splitIndex);
-            const message = rawPacket.substring(splitIndex + 1);
+            const encodedPayload = rawPacket.substring(splitIndex + 1);
 
             if (header.length === 4) {
                 const target = header.substring(0, 2);
                 const sender = header.substring(2, 4);
 
-                if (target === '**' || target === MY_ID) {
-                    appendMessage(sender, target, message, false);
+                // Traduz Base64 de volta pra texto original limpo
+                const decodedText = base64ToUtf8(encodedPayload);
+                
+                if (decodedText && (target === '**' || target === MY_ID)) {
+                    appendMessage(sender, target, decodedText, false);
                 }
             }
         }
@@ -562,7 +531,6 @@
 
         const hzPerBin = (audioCtxRx.sampleRate / 2) / bufferLength;
 
-        // Só desenha se o painel estiver aberto para poupar bateria
         if(!panel.classList.contains('is-collapsed')) {
             drawSpectrogram(dataArray);
         }
@@ -590,7 +558,6 @@
                         state.isReceiving = true;
                         state.buffer = "";
                         state.lastSignalTime = now;
-                        playIncomingAlert();
                         checkUIIndicator();
                     }
                     state.lastChar = null;
@@ -629,6 +596,7 @@
                 if (now - state.lastCharTime > TONE_GAP * 2) state.lastChar = null;
             }
 
+            // Timeout de finalização (Failsafe)
             if (state.isReceiving && (now - state.lastSignalTime > 2000)) {
                 finalizePacket(modeKey);
             }
