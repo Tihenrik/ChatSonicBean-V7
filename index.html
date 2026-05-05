@@ -74,9 +74,14 @@
                 </div>
             </div>
             
-            <button id="btn-toggle-panel" class="w-10 h-10 flex justify-center items-center rounded-full bg-slate-800 text-slate-300 hover:bg-slate-700 active:scale-95 transition-all">
-                <i class="ph-fill ph-faders text-xl"></i>
-            </button>
+            <div class="flex items-center gap-2">
+                <button id="btn-clear-chat" class="w-10 h-10 flex justify-center items-center rounded-full text-slate-400 hover:text-red-400 hover:bg-slate-800 active:scale-95 transition-all" title="Limpar Conversa">
+                    <i class="ph-fill ph-trash text-lg"></i>
+                </button>
+                <button id="btn-toggle-panel" class="w-10 h-10 flex justify-center items-center rounded-full bg-slate-800 text-slate-300 hover:bg-slate-700 active:scale-95 transition-all">
+                    <i class="ph-fill ph-faders text-xl"></i>
+                </button>
+            </div>
         </div>
     </header>
 
@@ -105,16 +110,19 @@
     </div>
 
     <!-- ===== ÁREA DO CHAT ===== -->
-    <main id="chat-history" class="flex-grow p-4 overflow-y-auto flex flex-col gap-4 scroll-smooth bg-slate-950 relative z-0 pb-6">
-        <div class="text-center w-full my-4">
+    <main id="chat-history" class="flex-grow p-4 overflow-y-auto flex flex-col scroll-smooth bg-slate-950 relative z-0 pb-6">
+        <div class="text-center w-full my-4 shrink-0">
             <span class="bg-slate-900 text-slate-400 border border-slate-800 text-[10px] font-mono px-3 py-1.5 rounded-full">
                 Rede P2P Acústica Isolada
             </span>
         </div>
+        
+        <!-- Container onde as mensagens são injetadas -->
+        <div id="messages-container" class="flex flex-col gap-4"></div>
     </main>
 
     <!-- ===== INDICADOR DE RECEBIMENTO (MODAL CENTRAL) ===== -->
-    <div id="receiving-indicator" class="hidden fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-slate-900/90 backdrop-blur-xl border border-emerald-500/30 text-emerald-300 p-8 rounded-[2rem] shadow-[0_0_50px_rgba(16,185,129,0.15)] z-50 flex-col items-center justify-center gap-4 min-w-[220px]">
+    <div id="receiving-indicator" class="hidden fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-slate-900/95 backdrop-blur-xl border border-emerald-500/30 text-emerald-300 p-8 rounded-[2rem] shadow-[0_0_50px_rgba(16,185,129,0.15)] z-50 flex-col items-center justify-center gap-4 min-w-[220px]">
         <div class="relative w-16 h-16 flex justify-center items-center mb-2">
             <div class="absolute inset-0 bg-emerald-500/20 rounded-full animate-ping"></div>
             <i class="ph-fill ph-radar text-4xl text-emerald-400 relative z-10 animate-[spin_3s_linear_infinite]"></i>
@@ -162,27 +170,11 @@
 
     <script>
     // ============================================================
-    //  ENCODER / DECODER BASE64 (Suporte a UTF-8, Acentos, Emojis)
+    //  NOVO SISTEMA DE ENCODING (Resistente a falhas do Áudio)
     // ============================================================
-    function utf8ToBase64(str) {
-        return btoa(unescape(encodeURIComponent(str)));
-    }
-    function base64ToUtf8(str) {
-        try {
-            return decodeURIComponent(escape(atob(str)));
-        } catch (e) {
-            return null; // Falha na decodificação devido a ruído
-        }
-    }
-    function escapeHTML(str) {
-        return str.replace(/[&<>'"]/g, tag => ({
-            '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
-        }[tag]));
-    }
-
-    // O CHARSET FDM agora contém exatamente o alfabeto Base64 + o separador ':'
-    // Tamanho total: 66 caracteres.
-    const CHARSET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=:";
+    // O espaço em branco é o primeiro, seguido de alfanuméricos e caracteres de encode.
+    // Total: 74 caracteres. Isso nos permite transmitir com segurança.
+    const CHARSET = " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789%.-_!~*'():";
     
     const MY_ID = Array.from({length: 2}, () => 'abcdefghijklmnopqrstuvwxyz0123456789'.charAt(Math.floor(Math.random() * 36))).join('');
     document.getElementById('my-id-display').textContent = MY_ID.toUpperCase();
@@ -204,15 +196,23 @@
 
     const delay = ms => new Promise(res => setTimeout(res, ms));
 
+    function escapeHTML(str) {
+        return str.replace(/[&<>'"]/g, tag => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+        }[tag]));
+    }
+
     // ============================================================
     //  UI INTERACTIONS 
     // ============================================================
     const panel = document.getElementById('controls-panel');
     const btnTogglePanel = document.getElementById('btn-toggle-panel');
+    const btnClearChat = document.getElementById('btn-clear-chat');
     const targetSelector = document.getElementById('target-selector');
     const targetInput = document.getElementById('target-id-input');
     const txInput = document.getElementById('tx-input');
     const chatHistory = document.getElementById('chat-history');
+    const messagesContainer = document.getElementById('messages-container');
 
     btnTogglePanel.addEventListener('click', () => {
         panel.classList.toggle('is-collapsed');
@@ -228,7 +228,13 @@
         }
     });
 
-    // Auto-resize textarea apenas (limites de caracteres removidos)
+    // Limpar Conversa
+    btnClearChat.addEventListener('click', () => {
+        messagesContainer.innerHTML = '';
+        showToast('Conversa limpa com sucesso', 'info');
+    });
+
+    // Auto-resize textarea sem limites
     txInput.addEventListener('input', function() {
         this.style.height = 'auto';
         const newHeight = Math.min(this.scrollHeight, 120); 
@@ -275,21 +281,21 @@
             <div class="px-3.5 py-2.5 rounded-2xl shadow-sm text-[14px] leading-relaxed break-words font-medium whitespace-pre-wrap ${bgClass}">${safeText}</div>
         `;
 
-        chatHistory.appendChild(bubble);
+        messagesContainer.appendChild(bubble);
         scrollToBottom();
     }
 
     // ============================================================
-    //  CONFIGURAÇÕES DO PROTOCOLO E ÁUDIO
+    //  CONFIGURAÇÕES DO PROTOCOLO E ÁUDIO (Recalibrado para 74 chars)
     // ============================================================
     const MODES = {
         audible: {
-            BASE_FREQ: 1000, FREQ_STEP: 40, SYNC_FREQ: 4000, END_FREQ: 800,
+            BASE_FREQ: 1000, FREQ_STEP: 35, SYNC_FREQ: 4000, END_FREQ: 800,
             BAND_MIN: 700, BAND_MAX: 4200, color: 'cyan'
         },
         ultra: {
-            BASE_FREQ: 18000, FREQ_STEP: 70, SYNC_FREQ: 17500, END_FREQ: 17000,
-            BAND_MIN: 16800, BAND_MAX: 22700, color: 'purple' // Band max ajustado levemente para caber o alfabeto base64 (66)
+            BASE_FREQ: 18000, FREQ_STEP: 50, SYNC_FREQ: 17500, END_FREQ: 17000,
+            BAND_MIN: 16800, BAND_MAX: 22200, color: 'purple' 
         }
     };
 
@@ -339,8 +345,9 @@
         let target = targetSelector.value === 'custom' ? targetInput.value.toLowerCase() : '**';
         if (target.length !== 2) target = '**';
 
-        // Codificação robusta convertendo caracteres complexos em pacote seguro FDM
-        const encodedData = utf8ToBase64(rawText);
+        // Encoding via URI Component: mantém a-z A-Z 0-9 normais e só encoda emojis/acentos
+        // Retiramos a conversão do espaço (%20) para economizar tempo de áudio
+        const encodedData = encodeURIComponent(rawText).replace(/%20/g, ' ');
         const packet = `${target}${MY_ID}:${encodedData}`;
 
         if (!audioCtxTx) audioCtxTx = new (window.AudioContext || window.webkitAudioContext)();
@@ -512,9 +519,14 @@
                 const target = header.substring(0, 2);
                 const sender = header.substring(2, 4);
 
-                // Traduz Base64 de volta pra texto original limpo
-                const decodedText = base64ToUtf8(encodedPayload);
-                
+                let decodedText = encodedPayload; // Fallback caso haja ruído severo
+                try {
+                    // Tenta decodificar restaurando o %20 dos espaços
+                    decodedText = decodeURIComponent(encodedPayload.replace(/ /g, '%20'));
+                } catch(e) {
+                    console.warn("Acoustic packet partially corrupted. Showing raw decoded data.");
+                }
+
                 if (decodedText && (target === '**' || target === MY_ID)) {
                     appendMessage(sender, target, decodedText, false);
                 }
@@ -596,7 +608,7 @@
                 if (now - state.lastCharTime > TONE_GAP * 2) state.lastChar = null;
             }
 
-            // Timeout de finalização (Failsafe)
+            // Timeout de finalização (Failsafe caso o END_FREQ se perca no vento)
             if (state.isReceiving && (now - state.lastSignalTime > 2000)) {
                 finalizePacket(modeKey);
             }
